@@ -1,75 +1,86 @@
-python3 - << 'PY'
-import json, sys, os, difflib
+cat > /root/ShabRahVpnBot/patch.json << 'EOF'
+[
+  {
+    "file": "/root/ShabRahVpnBot/plugins/commands.py",
+    "find": "    kb = InlineKeyboardMarkup([\n        [InlineKeyboardButton(\"👥 مدیریت کاربران\", callback_data=\"adm_users\")],\n        [\n            InlineKeyboardButton(\"💰 مدیریت مالی\", callback_data=\"adm_coming\"),\n            InlineKeyboardButton(\"🛠 مدیریت سرویس‌ها\", callback_data=\"adm_coming\")\n        ],\n        [\n            InlineKeyboardButton(\"⚙️ تنظیمات\", callback_data=\"adm_coming\"),\n            InlineKeyboardButton(\"📢 پیام همگانی\", callback_data=\"adm_broadcast\")\n        ],\n        [InlineKeyboardButton(\"💾 دریافت بکاپ دیتابیس (SQL)\", callback_data=\"adm_backup\")]\n    ])",
+    "replace": "    kb = InlineKeyboardMarkup([\n        [InlineKeyboardButton(\"👥 مدیریت کاربران\", callback_data=\"adm_users_1\")],\n        [\n            InlineKeyboardButton(\"💰 مدیریت مالی\", callback_data=\"adm_txs_1\"),\n            InlineKeyboardButton(\"🛠 مدیریت سرویس‌ها\", callback_data=\"adm_srvs_1\")\n        ],\n        [\n            InlineKeyboardButton(\"⚙️ تنظیمات\", callback_data=\"adm_settings\"),\n            InlineKeyboardButton(\"📢 پیام همگانی\", callback_data=\"adm_broadcast\")\n        ],\n        [InlineKeyboardButton(\"💾 دریافت بکاپ دیتابیس (SQL)\", callback_data=\"adm_backup\")]\n    ])"
+  },
+  {
+    "file": "/root/ShabRahVpnBot/plugins/inline.py",
+    "find": "    kb = InlineKeyboardMarkup([\n        [InlineKeyboardButton(\"👥 مدیریت کاربران\", callback_data=\"adm_users\")],\n        [\n            InlineKeyboardButton(\"💰 مدیریت مالی\", callback_data=\"adm_coming\"),\n            InlineKeyboardButton(\"🛠 مدیریت سرویس‌ها\", callback_data=\"adm_coming\")\n        ],\n        [\n            InlineKeyboardButton(\"⚙️ تنظیمات\", callback_data=\"adm_coming\"),\n            InlineKeyboardButton(\"📢 پیام همگانی\", callback_data=\"adm_broadcast\")\n        ],\n        [InlineKeyboardButton(\"💾 دریافت بکاپ دیتابیس (SQL)\", callback_data=\"adm_backup\")]\n    ])",
+    "replace": "    kb = InlineKeyboardMarkup([\n        [InlineKeyboardButton(\"👥 مدیریت کاربران\", callback_data=\"adm_users_1\")],\n        [\n            InlineKeyboardButton(\"💰 مدیریت مالی\", callback_data=\"adm_txs_1\"),\n            InlineKeyboardButton(\"🛠 مدیریت سرویس‌ها\", callback_data=\"adm_srvs_1\")\n        ],\n        [\n            InlineKeyboardButton(\"⚙️ تنظیمات\", callback_data=\"adm_settings\"),\n            InlineKeyboardButton(\"📢 پیام همگانی\", callback_data=\"adm_broadcast\")\n        ],\n        [InlineKeyboardButton(\"💾 دریافت بکاپ دیتابیس (SQL)\", callback_data=\"adm_backup\")]\n    ])"
+  },
+  {
+    "file": "/root/ShabRahVpnBot/plugins/inline.py",
+    "find": "@Client.on_callback_query(filters.regex(\"^adm_users$\"))\n@ensure_user\nasync def adm_users_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n\n    db = SessionLocal()\n    from helpers.models import User\n    users = db.query(User).order_by(User.id.desc()).limit(10).all()\n\n    kb = []\n    for u in users:\n        kb.append([InlineKeyboardButton(f\"👤 {u.first_name or u.username or u.telegram_id} ({u.telegram_id})\", callback_data=f\"adm_usr_{u.id}\")])\n\n    kb.append([InlineKeyboardButton(\"🔍 جستجوی کاربر\", callback_data=\"adm_search\")])\n    kb.append([InlineKeyboardButton(\"🔙 بازگشت به پنل ادمین\", callback_data=\"adm_home\")])\n\n    db.close()\n    await callback.message.edit_text(\"👥 **لیست آخرین کاربران ثبت‌نام شده:**\\n\\nجهت مشاهده جزئیات یا مدیریت، روی کاربر کلیک کنید یا دکمه جستجو را بزنید:\", reply_markup=InlineKeyboardMarkup(kb))",
+    "replace": "@Client.on_callback_query(filters.regex(r\"^adm_users(?:_(\\d+))?$\"))\n@ensure_user\nasync def adm_users_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    page = int(callback.matches[0].group(1)) if callback.matches and callback.matches[0].group(1) else 1\n    per_page = 10\n    db = SessionLocal()\n    try:\n        from helpers.models import User\n        total = db.query(User).count()\n        pages = max(1, math.ceil(total / per_page))\n        if page < 1: page = 1\n        if page > pages: page = pages\n        users = db.query(User).order_by(User.id.desc()).offset((page - 1) * per_page).limit(per_page).all()\n        kb = []\n        for u in users:\n            kb.append([InlineKeyboardButton(f\"👤 {u.first_name or u.username or u.telegram_id} ({u.telegram_id})\", callback_data=f\"adm_usr_{u.id}\")])\n        nav = []\n        if page > 1:\n            nav.append(InlineKeyboardButton(\"⬅️ قبلی\", callback_data=f\"adm_users_{page-1}\"))\n        nav.append(InlineKeyboardButton(f\"{page}/{pages}\", callback_data=\"ignore\"))\n        if page < pages:\n            nav.append(InlineKeyboardButton(\"بعدی ➡️\", callback_data=f\"adm_users_{page+1}\"))\n        if nav:\n            kb.append(nav)\n        kb.append([InlineKeyboardButton(\"🔍 جستجوی کاربر\", callback_data=\"adm_search\")])\n        kb.append([InlineKeyboardButton(\"🔙 بازگشت به پنل ادمین\", callback_data=\"adm_home\")])\n        await callback.message.edit_text(f\"👥 **لیست کاربران (صفحه {page}):**\\n\\nجهت مشاهده جزئیات یا مدیریت، روی کاربر کلیک کنید یا دکمه جستجو را بزنید:\", reply_markup=InlineKeyboardMarkup(kb))\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(r\"^adm_txs(?:_(\\d+))?$\"))\n@ensure_user\nasync def adm_txs_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    page = int(callback.matches[0].group(1)) if callback.matches and callback.matches[0].group(1) else 1\n    per_page = 10\n    db = SessionLocal()\n    try:\n        from helpers.models import Transaction\n        from sqlalchemy.orm import joinedload\n        total = db.query(Transaction).count()\n        pages = max(1, math.ceil(total / per_page))\n        if page < 1: page = 1\n        if page > pages: page = pages\n        txs = db.query(Transaction).options(joinedload(Transaction.user)).order_by(Transaction.id.desc()).offset((page - 1) * per_page).limit(per_page).all()\n        txt = f\"💰 **گزارش تراکنش‌ها (صفحه {page} از {pages}):**\\n\\n\"\n        for t in txs:\n            sign = \"+\" if t.amount > 0 else \"\"\n            dt_tehran = to_tehran(t.date)\n            date_str = jdatetime.datetime.fromgregorian(datetime=dt_tehran).strftime(\"%Y/%m/%d %H:%M\") if dt_tehran else \"نامشخص\"\n            status_icon = \"✅\" if t.status == \"success\" else \"⏳\" if t.status == \"pending\" else \"❌\"\n            u_info = f\"{t.user.first_name or ''} ({t.user.telegram_id})\" if t.user else \"سیستم\"\n            txt += (\n                f\"{status_icon} **{t.type}** | {sign}{t.amount:,.0f} ت\\n\"\n                f\"👤 {u_info}\\n\"\n                f\"▫️ {t.description or '-'}\\n\"\n                f\"📅 {date_str} | ID: {t.id}\\n\"\n                f\"〰️〰️〰️〰️〰️〰️〰️〰️\\n\"\n            )\n        if not txs:\n            txt += \"هیچ تراکنشی یافت نشد.\"\n        kb = []\n        nav = []\n        if page > 1:\n            nav.append(InlineKeyboardButton(\"⬅️ قبلی\", callback_data=f\"adm_txs_{page-1}\"))\n        nav.append(InlineKeyboardButton(f\"{page}/{pages}\", callback_data=\"ignore\"))\n        if page < pages:\n            nav.append(InlineKeyboardButton(\"بعدی ➡️\", callback_data=f\"adm_txs_{page+1}\"))\n        if nav:\n            kb.append(nav)\n        kb.append([InlineKeyboardButton(\"🔙 بازگشت به پنل ادمین\", callback_data=\"adm_home\")])\n        await callback.message.edit_text(txt, reply_markup=InlineKeyboardMarkup(kb))\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(r\"^adm_srvs(?:_(\\d+))?$\"))\n@ensure_user\nasync def adm_srvs_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    page = int(callback.matches[0].group(1)) if callback.matches and callback.matches[0].group(1) else 1\n    per_page = 10\n    db = SessionLocal()\n    try:\n        from helpers.models import Service\n        from sqlalchemy.orm import joinedload\n        total = db.query(Service).count()\n        pages = max(1, math.ceil(total / per_page))\n        if page < 1: page = 1\n        if page > pages: page = pages\n        srvs = db.query(Service).options(joinedload(Service.user)).order_by(Service.id.desc()).offset((page - 1) * per_page).limit(per_page).all()\n        kb = []\n        for s in srvs:\n            u_info = f\"{s.user.first_name or ''}\" if s.user else \"سیستم\"\n            status_emoji = \"🟢\" if s.status == \"active\" else \"🔴\"\n            kb.append([InlineKeyboardButton(f\"{status_emoji} {s.name or 'سرویس'} | 👤 {u_info}\", callback_data=f\"adm_srv_detail_{s.id}\")])\n        nav = []\n        if page > 1:\n            nav.append(InlineKeyboardButton(\"⬅️ قبلی\", callback_data=f\"adm_srvs_{page-1}\"))\n        nav.append(InlineKeyboardButton(f\"{page}/{pages}\", callback_data=\"ignore\"))\n        if page < pages:\n            nav.append(InlineKeyboardButton(\"بعدی ➡️\", callback_data=f\"adm_srvs_{page+1}\"))\n        if nav:\n            kb.append(nav)\n        kb.append([InlineKeyboardButton(\"🔙 بازگشت به پنل ادمین\", callback_data=\"adm_home\")])\n        await callback.message.edit_text(f\"🛠 **لیست سرویس‌ها (صفحه {page} از {pages}):**\\n\\nبرای مشاهده یا مدیریت سرویس روی آن کلیک کنید:\", reply_markup=InlineKeyboardMarkup(kb))\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(r\"^adm_srv_detail_(\\d+)$\"))\n@ensure_user\nasync def adm_srv_detail_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    sid = int(callback.matches[0].group(1))\n    db = SessionLocal()\n    try:\n        from helpers.models import Service\n        from sqlalchemy.orm import joinedload\n        import jdatetime\n        s = db.query(Service).filter(Service.id == sid).options(joinedload(Service.panel), joinedload(Service.plan), joinedload(Service.user)).first()\n        if not s:\n            return await callback.answer(\"سرویس یافت نشد.\", show_alert=True)\n        u_info = f\"{s.user.first_name or ''} ({s.user.telegram_id})\" if s.user else \"سیستم\"\n        plan_title = s.plan.title if s.plan else \"نامشخص\"\n        panel_name = s.panel.name if s.panel else \"نامشخص\"\n        used_gb = (s.traffic_used or 0) / (1024**3)\n        total_gb = (s.traffic_total or 0) / (1024**3)\n        expire_str = jdatetime.datetime.fromgregorian(datetime=to_tehran(s.expire_date)).strftime(\"%Y/%m/%d %H:%M\") if s.expire_date else \"نامحدود\"\n        txt = (\n            f\"🛠 **جزئیات سرویس:**\\n\\n\"\n            f\"🆔 شناسه: {s.id}\\n\"\n            f\"🖥 نام سرویس: {s.name or 'بدون نام'}\\n\"\n            f\"👤 کاربر: {u_info}\\n\"\n            f\"📍 سرور متصل: {panel_name}\\n\"\n            f\"📦 پلن: {plan_title}\\n\"\n            f\"📊 مصرف: {used_gb:.2f} از {total_gb:.2f} GB\\n\"\n            f\"⏳ انقضا: {expire_str}\\n\"\n            f\"📡 وضعیت: {s.status}\\n\"\n            f\"🔑 UUID: `{s.uuid}`\"\n        )\n        toggle_lbl = \"🔴 غیرفعال کردن\" if s.status == \"active\" else \"🟢 فعال کردن\"\n        kb = InlineKeyboardMarkup([\n            [InlineKeyboardButton(toggle_lbl, callback_data=f\"adm_srv_toggle_{s.id}\")],\n            [InlineKeyboardButton(\"🗑 حذف سرویس\", callback_data=f\"adm_srv_del_{s.id}\")],\n            [InlineKeyboardButton(\"🔙 بازگشت به لیست\", callback_data=\"adm_srvs_1\")]\n        ])\n        await callback.message.edit_text(txt, reply_markup=kb)\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(r\"^adm_srv_toggle_(\\d+)$\"))\n@ensure_user\nasync def adm_srv_toggle_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    sid = int(callback.matches[0].group(1))\n    db = SessionLocal()\n    try:\n        from helpers.models import Service\n        from helpers.pasarguard import get_panel_manager\n        s = db.query(Service).get(sid)\n        if not s or not s.panel:\n            return await callback.answer(\"سرویس یا پنل یافت نشد.\", show_alert=True)\n        mgr = get_panel_manager(s.panel)\n        new_status = \"disabled\" if s.status == \"active\" else \"active\"\n        enable_bool = (new_status == \"active\")\n        res = await mgr.toggle_user_status(s.uuid, enable_bool)\n        if res:\n            s.status = new_status\n            db.commit()\n            await callback.answer(f\"سرویس با موفقیت {new_status} شد.\", show_alert=True)\n            await adm_srv_detail_callback(client, callback)\n        else:\n            await callback.answer(\"خطا در تغییر وضعیت روی سرور.\", show_alert=True)\n    except Exception as e:\n        await callback.answer(f\"خطا: {e}\", show_alert=True)\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(r\"^adm_srv_del_(\\d+)$\"))\n@ensure_user\nasync def adm_srv_del_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    sid = int(callback.matches[0].group(1))\n    db = SessionLocal()\n    try:\n        from helpers.models import Service\n        from helpers.pasarguard import get_panel_manager\n        s = db.query(Service).get(sid)\n        if not s:\n            return await callback.answer(\"سرویس یافت نشد.\", show_alert=True)\n        if s.panel:\n            try:\n                mgr = get_panel_manager(s.panel)\n                await mgr.remove_user(s.uuid)\n            except:\n                pass\n        db.delete(s)\n        db.commit()\n        await callback.answer(\"سرویس با موفقیت حذف شد.\", show_alert=True)\n        await callback.message.edit_text(\"✅ سرویس با موفقیت حذف شد.\", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(\"🔙 بازگشت به لیست\", callback_data=\"adm_srvs_1\")]]))\n    except Exception as e:\n        await callback.answer(f\"خطا: {e}\", show_alert=True)\n    finally:\n        db.close()\n\n@Client.on_callback_query(filters.regex(\"^adm_settings$\"))\n@ensure_user\nasync def adm_settings_callback(client: Client, callback: CallbackQuery):\n    admin_ids = [int(x) for x in configs.ADMINS if str(x).isdigit()]\n    if callback.from_user.id not in admin_ids:\n        return await callback.answer(\"دسترسی غیرمجاز\", show_alert=True)\n    txt = (\n        \"⚙️ **تنظیمات ربات**\\n\\n\"\n        f\"وضعیت فروش فعلی: {configs.ORDER_STATUS}\\n\"\n        f\"عضویت اجباری: {'فعال' if configs.FORCE_JOIN_ENABLED else 'غیرفعال'}\\n\"\n        f\"کارت به کارت: {'فعال' if configs.PAY_CARD_ENABLED else 'غیرفعال'}\\n\"\n        f\"درگاه نوپیمنت: {'فعال' if configs.PAY_NOWPAYMENTS_ENABLED else 'غیرفعال'}\\n\"\n        f\"استارز: {'فعال' if configs.PAY_STARS_ENABLED else 'غیرفعال'}\\n\\n\"\n        \"برای تغییر تنظیمات دیگر یا ویرایش این موارد، به پنل مدیریت تحت وب مراجعه کنید.\"\n    )\n    kb = InlineKeyboardMarkup([\n        [InlineKeyboardButton(\"🔙 بازگشت به پنل ادمین\", callback_data=\"adm_home\")]\n    ])\n    await callback.message.edit_text(txt, reply_markup=kb)"
+  },
+  {
+    "file": "/root/ShabRahVpnBot/plugins/inline.py",
+    "find": "@Client.on_callback_query(filters.regex(\"^adm_coming$\"))\nasync def adm_coming_callback(client: Client, callback: CallbackQuery):\n    await callback.answer(\"🌐 لطفاً برای دسترسی به این بخش از پنل مدیریت تحت وب استفاده کنید.\", show_alert=True)",
+    "replace": "@Client.on_callback_query(filters.regex(\"^ignore$\"))\nasync def ignore_callback(client: Client, callback: CallbackQuery):\n    await callback.answer()"
+  }
+]
+EOF
 
-data = json.load(sys.stdin)
-if isinstance(data, dict):
-    data = [data]
 
-RED = "\033[91m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-RESET = "\033[0m"
+cd /root/ShabRahVpnBot
+python3 << 'PY'
+import json, sys, os, difflib, math
 
-def norm_lines(s):
-    return [l.rstrip() for l in s.replace("\r\n", "\n").strip("\n").split("\n")]
+PATCH_FILE = "patch.json"
+RED = "\033[91m"; GREEN = "\033[92m"; YELLOW = "\033[93m"; RESET = "\033[0m"
 
+def norm_lines(s): return [l.rstrip() for l in s.replace("\r\n", "\n").strip("\n").split("\n")]
 def match_block(lines, pattern):
     n = len(pattern)
     for i in range(len(lines) - n + 1):
-        if lines[i:i+n] == pattern:
-            return i
+        if lines[i:i+n] == pattern: return i
     return -1
 
-def show_diff(old_lines, new_lines, file):
-    diff = difflib.unified_diff(
-        old_lines,
-        new_lines,
-        fromfile=f"a/{file}",
-        tofile=f"b/{file}",
-        lineterm=""
-    )
+def show_diff(old, new, file):
+    diff = difflib.unified_diff(old, new, fromfile=f"a/{file}", tofile=f"b/{file}", lineterm="")
     for line in diff:
-        if line.startswith("-") and not line.startswith("---"):
-            print(RED + line + RESET)
-        elif line.startswith("+") and not line.startswith("+++"):
-            print(GREEN + line + RESET)
-        elif line.startswith("@@"):
-            print(YELLOW + line + RESET)
-        else:
-            print(line)
+        if line.startswith("-") and not line.startswith("---"): print(RED + line + RESET)
+        elif line.startswith("+") and not line.startswith("+++"): print(GREEN + line + RESET)
+        elif line.startswith("@@"): print(YELLOW + line + RESET)
+        else: print(line)
 
-def apply_patch(p):
+def apply(p):
     file = p.get("file")
     find = p.get("find", "").replace("\r\n", "\n")
-    replace = p.get("replace", "").replace("\r\n", "\n")
+    repl = p.get("replace", "").replace("\r\n", "\n")
 
     if not file or not os.path.exists(file):
-        print(f"{RED}MISS {file}{RESET}")
-        return
+        print(f"{RED}MISS {file}{RESET}"); return
 
-    with open(file, "r", encoding="utf-8") as f:
-        content = f.read().replace("\r\n", "\n")
-
+    with open(file, "r", encoding="utf-8") as f: content = f.read().replace("\r\n", "\n")
     lines = content.split("\n")
     find_lines = norm_lines(find)
-    replace_lines = replace.strip("\n").split("\n")
+    repl_lines = repl.strip("\n").split("\n")
 
     idx = match_block(lines, find_lines)
-
     if idx == -1:
+        # Debug: Show first 5 lines of expected vs actual around expected area
         print(f"{RED}NO_MATCH {file}{RESET}")
+        print(f"{YELLOW}Expected block start:{RESET}")
+        for i, l in enumerate(find_lines[:5]): print(f"  {i}: {repr(l)}")
+        print(f"{YELLOW}Actual file lines (0-20):{RESET}")
+        for i, l in enumerate(lines[:20]): print(f"  {i}: {repr(l)}")
         return
 
-    new_lines = lines[:idx] + replace_lines + lines[idx+len(find_lines):]
-
+    new_lines = lines[:idx] + repl_lines + lines[idx+len(find_lines):]
     print(f"\n{YELLOW}--- PATCH DIFF: {file} ---{RESET}")
     show_diff(lines, new_lines, file)
 
-    with open(file, "w", encoding="utf-8") as f:
-        f.write("\n".join(new_lines) + "\n")
-
+    with open(file, "w", encoding="utf-8") as f: f.write("\n".join(new_lines) + "\n")
     print(f"{GREEN}PATCHED {file}{RESET}\n")
 
-for p in data:
-    apply_patch(p)
-PY
+if __name__ == "__main__":
+    if not os.path.exists(PATCH_FILE):
+        print(f"{RED}patch.json not found in {os.getcwd()}{RESET}"); sys.exit(1)
+    with open(PATCH_FILE, "r", encoding="utf-8") as f:
+        try: data = json.load(f)
+        except json.JSONDecodeError as e: print(f"{RED}Invalid JSON: {e}{RESET}"); sys.exit(1)
+    if isinstance(data, dict): data = [data]
+    for p in data: apply(p)
