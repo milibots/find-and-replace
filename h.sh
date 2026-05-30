@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-
 set -e
 
-if [ -t 0 ]; then
-  echo "No input provided (pipe JSON into this script)"
+if [ -z "$1" ]; then
+  echo "Usage: bash h.sh patch.json"
   exit 1
 fi
 
-python3 - << 'PY'
+python3 - << 'PY' "$1"
 import json, sys, os
 
-data = json.load(sys.stdin)
+path = sys.argv[1]
+
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
 if isinstance(data, dict):
     data = [data]
 
